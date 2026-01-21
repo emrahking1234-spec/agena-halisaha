@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { listenReservations, createReservationSafe } from "./services/reservationsRealtime";
 
 /** LocalStorage Keys */
 const LS_USERS = "hs_users_v2";
@@ -896,7 +897,14 @@ function AdminLikePanel({ role, currentUsername }) {
   const activePitch = useMemo(() => pitches.find(p=>p.id===activePitchId) || pitches[0], [pitches, activePitchId]);
 
   const [tick, setTick] = useState(0);
-  const bookingsAll = useMemo(() => load(LS_BOOKINGS, []), [tick]);
+  const [bookingsAll, setBookingsAll] = useState([]);
+
+useEffect(() => {
+  const unsub = listenReservations((data) => {
+    setBookingsAll(data);
+  });
+  return () => unsub();
+}, []);
 
   const dayBookings = useMemo(() => {
     const physical = bookingsAll.filter((b) => b.pitchId === activePitchId && b.date === selectedISO);
@@ -1060,7 +1068,7 @@ function AdminLikePanel({ role, currentUsername }) {
     setSelectedSlotBookings([]);
   }, [selectedISO, activePitchId]);
 
-  function saveBooking() {
+  async function saveBooking() {
     setInfo("");
     if (!selectedFreeSlot) return setInfo("Önce boş saat seç.");
 
@@ -1089,9 +1097,12 @@ function AdminLikePanel({ role, currentUsername }) {
     const overlapNow = dayBookings.some((b) => rangesOverlap(payload.startTime, payload.endTime, b.startTime, b.endTime));
     if (overlapNow) return setInfo("Bu saat dolu.");
 
-    const list = load(LS_BOOKINGS, []);
-    list.push(payload);
-    save(LS_BOOKINGS, list);
+    try {
+      await createReservationSafe(payload);
+    } catch (err) {
+      setInfo(err.message || "Bu saat dolu.");
+      return;
+    }
 
     upsertCustomerFromBooking({
       phone: payload.phone,
