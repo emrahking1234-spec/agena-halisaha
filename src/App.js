@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { listenReservations, createReservationSafe } from "./services/reservationsRealtime";
+import { listenReservations, createReservationSafe, deleteReservation, updateReservation } from "./services/reservationsRealtime";
 
 /** LocalStorage Keys */
 const LS_USERS = "hs_users_v2";
@@ -1126,24 +1126,32 @@ useEffect(() => {
   }
 
   function delBooking(id, bookingObj) {
-    const list = load(LS_BOOKINGS, []);
-    const b = bookingObj || list.find(x => x.id === id);
+    const b = bookingObj;
     if (!b) return;
 
+    // Abone: bu haftayı iptal (exception ekle)
     if (b._virtual && b.matchType === "abone") {
-      const master = list.find(x => x.id === b.id);
-      if (!master) return;
       const dateToSkip = b._virtualForDate;
-      const ex = Array.isArray(master.aboneExceptions) ? master.aboneExceptions : [];
-      if (!ex.includes(dateToSkip)) master.aboneExceptions = [...ex, dateToSkip];
-      save(LS_BOOKINGS, [...list]);
-      addLog({ action:"Abone - bu hafta iptal (sil)", by: currentUsername, detail:`${master.pitchName} — ${dateToSkip} — ${master.startTime}-${master.endTime} — ${master.firstName} ${master.lastName}` });
+      const ex = Array.isArray(b.aboneExceptions) ? b.aboneExceptions : [];
+      if (!ex.includes(dateToSkip)) {
+        updateReservation(b.id, { aboneExceptions: [...ex, dateToSkip] });
+      }
       setInfo("Bu haftalık abonelik iptal edildi ✅");
       setSelectedBusySlot(null);
       setSelectedSlotBookings([]);
       refresh();
       return;
     }
+
+    // Normal silme
+    deleteReservation(id);
+    setInfo("Silindi ✅");
+    setSelectedBusySlot(null);
+    setSelectedSlotBookings([]);
+    refresh();
+  }
+/*
+
 
     const next = list.filter(x => x.id !== id);
     save(LS_BOOKINGS, next);
@@ -1154,23 +1162,29 @@ useEffect(() => {
     refresh();
   }
 
+*/
+
   function markNoShow(id, bookingObj) {
-    const list = load(LS_BOOKINGS, []);
-    const b = bookingObj || list.find(x => x.id === id);
+    const b = bookingObj;
     if (!b) return;
 
     if (b.matchType === "abone") {
       const dateToSkip = b._virtual ? b._virtualForDate : b.date;
-      const master = list.find(x => x.id === b.id);
-      if (!master) return;
-      const ex = Array.isArray(master.aboneExceptions) ? master.aboneExceptions : [];
-      if (!ex.includes(dateToSkip)) master.aboneExceptions = [...ex, dateToSkip];
-      save(LS_BOOKINGS, [...list]);
-      addLog({ action:"Abone - gelmedi (bu hafta iptal)", by: currentUsername, detail:`${master.pitchName} — ${dateToSkip} — ${master.startTime}-${master.endTime} — ${master.firstName} ${master.lastName}` });
+      const ex = Array.isArray(b.aboneExceptions) ? b.aboneExceptions : [];
+      if (!ex.includes(dateToSkip)) {
+        updateReservation(b.id, { aboneExceptions: [...ex, dateToSkip] });
+      }
       setInfo("Abone bu hafta iptal edildi ✅");
       refresh();
       return;
     }
+
+    updateReservation(id, { noShow: true });
+    setInfo("Gelmedi işaretlendi ✅");
+    refresh();
+  }
+/*
+
 
     const next = list.map(x => x.id === id ? { ...x, noShow:true } : x);
     save(LS_BOOKINGS, next);
@@ -1179,9 +1193,10 @@ useEffect(() => {
     refresh();
   }
 
+*/
+
   function aboneSkipNextWeek(masterId) {
-    const list = load(LS_BOOKINGS, []);
-    const master = list.find(x => x.id === masterId);
+    const master = bookingsAll.find(x => x.id === masterId);
     if (!master || master.matchType !== "abone") return;
 
     let target = selectedISO;
@@ -1192,6 +1207,21 @@ useEffect(() => {
         d = addDays(d, 1);
       }
     }
+/*
+
+
+    const ex = Array.isArray(master.aboneExceptions) ? master.aboneExceptions : [];
+    if (!ex.includes(target)) {
+      updateReservation(masterId, { aboneExceptions: [...ex, target] });
+    }
+    setInfo("Bu hafta abonelik boş bırakıldı ✅");
+    refresh();
+  }
+
+*/
+    }
+/*
+
 
     const ex = Array.isArray(master.aboneExceptions) ? master.aboneExceptions : [];
     if (!ex.includes(target)) master.aboneExceptions = [...ex, target];
@@ -1201,6 +1231,8 @@ useEffect(() => {
     setInfo("Bu hafta abonelik boş bırakıldı ✅");
     refresh();
   }
+
+*/
 
   function addToBlacklistFromBooking(b) {
     const phoneN = normalizePhone(b.phone);
