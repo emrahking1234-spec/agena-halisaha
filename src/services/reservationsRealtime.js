@@ -38,3 +38,14 @@ export async function createReservationSafe(payload) {
     throw new Error("Rezervasyon kaydedilemedi");
   }
 }
+
+
+import { deleteDoc, updateDoc, doc } from "firebase/firestore";
+
+export async function deleteReservation(id) {
+  await deleteDoc(doc(db, COL, id));
+}
+
+export async function updateReservation(id, payload) {
+  await updateDoc(doc(db, COL, id), payload);
+}
